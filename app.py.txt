@@ -1,0 +1,132 @@
+import streamlit as st
+import pickle
+from streamlit_mic_recorder import mic_recorder
+import speech_recognition as sr
+import tempfile
+import os
+
+# ---------------- PAGE CONFIG ----------------
+st.set_page_config(page_title="Mental Health Emotion Analyzer", layout="centered")
+
+# ---------------- LOAD MODEL ----------------
+model = pickle.load(open("model.pkl", "rb"))
+vectorizer = pickle.load(open("vectorizer.pkl", "rb"))
+
+# ---------------- SIDEBAR NAVIGATION ----------------
+st.sidebar.title("🧭 Navigation")
+page = st.sidebar.radio("Go to", ["🏠 Home", "🧠 Emotion Analyzer", "📊 About", "💬 Contact"])
+
+# =====================================================
+# 🏠 HOME PAGE
+# =====================================================
+if page == "🏠 Home":
+    st.title("💙 Mental Health Emotion Analyzer")
+    st.write("Welcome! This app detects your emotions from text or speech using Machine Learning.")
+    st.info("Use the sidebar to navigate and analyze your emotions.")
+
+# =====================================================
+# 🧠 EMOTION ANALYZER PAGE
+# =====================================================
+elif page == "🧠 Emotion Analyzer":
+    st.title("🧠 Emotion Analyzer")
+    st.write("Type OR Speak your feelings below 👇")
+
+    user_input = ""
+
+    # 🎤 MIC BUTTON
+    audio = mic_recorder(
+        start_prompt="🎤 Start Recording",
+        stop_prompt="Stop Recording",
+        key="recorder"
+    )
+
+    # Convert speech to text
+    if audio:
+        st.info("Processing speech...")
+        recognizer = sr.Recognizer()
+
+        # Save temporary audio file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp_file:
+            tmp_file.write(audio['bytes'])
+            tmp_filename = tmp_file.name
+
+        try:
+            with sr.AudioFile(tmp_filename) as source:
+                audio_data = recognizer.record(source)
+                user_input = recognizer.recognize_google(audio_data)
+                st.success("You said: " + user_input)
+        except:
+            st.error("Could not understand audio. Please try again.")
+        finally:
+            os.remove(tmp_filename)
+
+    # ✍ TEXT INPUT OPTION
+    text_input = st.text_area("Or type here:")
+
+    if text_input:
+        user_input = text_input
+
+    # 🔍 ANALYZE BUTTON
+    if st.button("Analyze Emotion"):
+        if user_input.strip() == "":
+            st.warning("Please speak or type something.")
+        else:
+            vec = vectorizer.transform([user_input])
+            prediction = model.predict(vec)[0]
+
+            emoji = {
+                "joy": "😄",
+                "sadness": "😢",
+                "anger": "😠",
+                "fear": "😨",
+                "love": "❤️",
+                "surprise": "😲",
+                "worry": "😟"
+            }
+
+            st.success(f"Detected Emotion: {prediction} {emoji.get(prediction,'🙂')}")
+
+            # 🎈 Balloons for joy
+            if prediction == "joy":
+                st.balloons()
+
+            # 💡 Wellness Tips
+            tips = {
+                "sadness": "Try talking to a friend or taking a short walk 🌿",
+                "anger": "Take deep breaths and relax 🧘",
+                "fear": "Focus on slow breathing 💙",
+                "worry": "Write down your thoughts ✍️",
+                "joy": "Spread your happiness 🌞"
+            }
+
+            st.info(tips.get(prediction, "Take care of yourself 💙"))
+
+# =====================================================
+# 📊 ABOUT PAGE
+# =====================================================
+elif page == "📊 About":
+    st.title("📊 About This Project")
+    st.write("""
+    This project is built using:
+    - Python
+    - Streamlit
+    - Machine Learning
+    - NLP (TF-IDF Vectorizer)
+
+    It analyzes text or speech and predicts emotions.
+    """)
+    st.success("Created as a Mental Health Awareness Project 💙")
+
+# =====================================================
+# 💬 CONTACT PAGE
+# =====================================================
+elif page == "💬 Contact":
+    st.title("💬 Contact & Feedback")
+    name = st.text_input("Your Name")
+    feedback = st.text_area("Your Feedback")
+
+    if st.button("Submit"):
+        if name and feedback:
+            st.success("Thank you for your feedback! 💙")
+        else:
+            st.warning("Please fill all fields.")
